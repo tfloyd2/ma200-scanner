@@ -303,15 +303,25 @@ function toggleDetail(tr, s){
     <div class="dcard"><h4>Stock plan</h4>
       <div class="kv"><span class="kk">Entry zone</span><span class="vv zone-pill">$${fmt(s.entry_zone[0])} – $${fmt(s.entry_zone[1])}</span></div>
       <div class="kv"><span class="kk">Invalidation (wkly close)</span><span class="vv">&lt; $${fmt(s.invalidation)}</span></div>
-      <div class="kv"><span class="kk">Target 1</span><span class="vv">$${fmt(s.stock_t1)}</span></div>
-      <div class="kv"><span class="kk">Target 2 (52w high)</span><span class="vv">$${fmt(s.stock_t2)}</span></div>
+      ${(s.targets && s.targets.length ? s.targets : [{p:s.stock_t1,l:'target'},{p:s.stock_t2,l:'52-wk high'}])
+        .map((t,i)=>`<div class="kv"><span class="kk">T${i+1} · ${t.l}</span><span class="vv">$${fmt(t.p)} <span class="name">(${fmt((t.p/s.close-1)*100,0)}%)</span></span></div>`).join('')}
       <div class="kv"><span class="kk">52-wk range</span><span class="vv">$${fmt(s.lo52)} – $${fmt(s.hi52)}</span></div>
     </div>
     <div class="dcard"><h4>Options play — long call</h4>
+      ${s.contract ? `
+      <div class="kv"><span class="kk">Live contract${s.contract.window==='swing'?' (swing DTE — LEAPS over budget)':''}</span><span class="vv zone-pill">${s.contract.exp} $${fmt(s.contract.strike,0)} C</span></div>
+      <div class="kv"><span class="kk">Premium (mid)</span><span class="vv">$${fmt(s.contract.mid)} <span class="name">(${fmt(s.contract.bid)}–${fmt(s.contract.ask)}, ${s.contract.spreadPct||''}% spr)</span></span></div>
+      <div class="kv"><span class="kk">Delta · IV</span><span class="vv">${s.contract.delta} · ${Math.round(s.contract.iv*100)}%</span></div>
+      <div class="kv"><span class="kk">OI · today's vol</span><span class="vv">${s.contract.oi.toLocaleString()} · ${(s.contract.vol||0).toLocaleString()}</span></div>
+      <div class="kv"><span class="kk">Max loss / contract</span><span class="vv">$${fmt(s.contract.maxloss,0)}</span></div>
+      <div class="kv"><span class="kk">+100% GTC target</span><span class="vv">$${fmt(s.contract.target100)}</span></div>
+      ${s.contract.stockFor2x ? `<div class="kv"><span class="kk">Stock needed for +100%</span><span class="vv">≈ $${fmt(s.contract.stockFor2x)} ${s.targets&&s.targets.length&&s.contract.stockFor2x<=s.targets[s.targets.length-1].p*1.02?'<span class="name">(inside T'+s.targets.length+' — reachable)</span>':'<span class="name">(beyond targets — consider exiting at levels)</span>'}</span></div>` : ''}
+      <div class="kv"><span class="kk">DTE</span><span class="vv">${s.contract.dte} days</span></div>
+      <div class="plan" style="font-size:11px">Quotes ~15 min delayed at last refresh — verify at your broker before entry.</div>` : `
       <div class="kv"><span class="kk">Structure</span><span class="vv">${s.call.type}</span></div>
       <div class="kv"><span class="kk">Target delta</span><span class="vv">${s.call.target_delta}</span></div>
       <div class="kv"><span class="kk">Strike (≈5% ITM)</span><span class="vv">~$${s.call.strike_hint}</span></div>
-      <div class="kv"><span class="kk">Expiry</span><span class="vv">${s.call.dte_hint}</span></div>
+      <div class="kv"><span class="kk">Expiry</span><span class="vv">${s.call.dte_hint}</span></div>`}
       <div class="plan">${s.call.plan}</div>
       <button class="primary conf-entry" data-entry2="${s.sym}">Confirm entry ▸</button>
     </div>
@@ -325,9 +335,11 @@ let pendingSetup=null, pendingClose=null;
 function openEntry(s){
   pendingSetup=s;
   $('#emTitle').textContent=`Confirm entry — ${s.sym}`;
-  $('#emHint').textContent=`Price $${fmt(s.close)} · zone $${fmt(s.entry_zone[0])}–$${fmt(s.entry_zone[1])} · suggested ~$${s.call.strike_hint} call, ${s.call.dte_hint}`;
-  $('#emContract').value=`$${s.call.strike_hint} C`;
-  $('#emPremium').value=''; $('#emQty').value='1'; $('#emNotes').value='';
+  $('#emHint').textContent = s.contract
+    ? `Price $${fmt(s.close)} · zone $${fmt(s.entry_zone[0])}–$${fmt(s.entry_zone[1])} · live: ${s.contract.exp} $${fmt(s.contract.strike,0)} C @ ~$${fmt(s.contract.mid)} mid (Δ${s.contract.delta})`
+    : `Price $${fmt(s.close)} · zone $${fmt(s.entry_zone[0])}–$${fmt(s.entry_zone[1])} · suggested ~$${s.call.strike_hint} call, ${s.call.dte_hint}`;
+  $('#emContract').value = s.contract ? `${s.contract.exp} $${fmt(s.contract.strike,0)} C` : `$${s.call.strike_hint} C`;
+  $('#emPremium').value = s.contract ? s.contract.mid : ''; $('#emQty').value='1'; $('#emNotes').value='';
   updRisk(); $('#entryOverlay').classList.add('open');
 }
 function updRisk(){
